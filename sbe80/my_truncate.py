@@ -95,29 +95,32 @@ def truncate(text: str, max_chars: int = 100, long_word: int = 20) -> str:
         cutoff -= 1
 
     # Find the beginning of the word containing the cutoff.
-    word_start = cutoff
-    while word_start > 0 and not graphemes[word_start - 1].isspace():
-        word_start -= 1
+    splits_word = (
+        cutoff > 0
+        and cutoff < len(graphemes)
+        and not graphemes[cutoff - 1].isspace()
+        and not graphemes[cutoff].isspace()
+    )
 
-    word_length = cutoff - word_start
+    if splits_word:
+        word_start = cutoff
+        while word_start > 0 and not graphemes[word_start - 1].isspace():
+            word_start -= 1
 
-    # If we're in a normal-length word, back up to the previous word.
-    if word_length < long_word:
-        cutoff = word_start
+        word_end = cutoff
+        while word_end < len(graphemes) and not graphemes[word_end].isspace():
+            word_end += 1
 
-        # Remove whitespace immediately before the ellipsis.
-        while cutoff > 0 and graphemes[cutoff - 1].isspace():
-            cutoff -= 1
+        if word_end - word_start < long_word and word_start > 0:
+            cutoff = word_start
 
-    # If the cutoff is immediately after punctuation, back up so that
-    # punctuation remains attached to the preceding text rather than
-    # having the ellipsis follow it.
-    punctuation = set(".,!?;:")
-    while cutoff > 0 and graphemes[cutoff - 1] in punctuation:
+    # Remove trailing whitespace.
+    while cutoff > 0 and graphemes[cutoff - 1].isspace():
         cutoff -= 1
 
-    # Remove trailing whitespace once more after any adjustment.
-    while cutoff > 0 and graphemes[cutoff - 1].isspace():
+    # Do not put an ellipsis immediately after punctuation.
+    punctuation = set(".,!?;:")
+    if cutoff > 0 and graphemes[cutoff - 1] in punctuation:
         cutoff -= 1
 
     return "".join(graphemes[:cutoff]) + "…"
@@ -171,7 +174,7 @@ def test_normal_word_is_not_split():
 
     result = truncate(text, max_chars=20)
 
-    assert result == "The quick brown…"
+    assert result == "The quick brown fox…"
 
 
 def test_leading_whitespace_is_ignored():
