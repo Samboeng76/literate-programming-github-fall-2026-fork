@@ -121,3 +121,251 @@ def truncate(text: str, max_chars: int = 100, long_word: int = 20) -> str:
         cutoff -= 1
 
     return "".join(graphemes[:cutoff]) + "…"
+
+import pytest
+
+def test_short_string_is_unchanged():
+    assert truncate("Hello, world!") == "Hello, world!"
+
+
+def test_exactly_max_chars_is_unchanged():
+    text = "a" * 100
+    assert truncate(text) == text
+
+
+def test_string_longer_than_max_chars_is_truncated():
+    text = "a" * 101
+    assert truncate(text) == "a" * 100 + "…"
+
+
+def test_ellipsis_is_101st_grapheme():
+    text = "a" * 150
+    result = truncate(text)
+
+    assert len(result) == 101
+    assert result[-1] == "…"
+
+
+def test_custom_max_chars():
+    text = "a" * 20
+
+    assert truncate(text, max_chars=10) == "a" * 10 + "…"
+
+
+def test_custom_long_word():
+    text = "a" * 30
+
+    assert truncate(text, max_chars=20, long_word=25) == "a" * 20 + "…"
+
+
+def test_long_word_can_be_split():
+    text = "ThisIsAVeryLongWordThatShouldBeSplit"
+
+    result = truncate(text, max_chars=20, long_word=20)
+
+    assert result == text[:20] + "…"
+
+
+def test_normal_word_is_not_split():
+    text = "The quick brown fox jumps over the lazy dog."
+
+    result = truncate(text, max_chars=20)
+
+    assert result == "The quick brown…"
+
+
+def test_leading_whitespace_is_ignored():
+    text = "     Hello world"
+
+    assert truncate(text) == "Hello world"
+
+
+def test_trailing_whitespace_is_ignored():
+    text = "Hello world     "
+
+    assert truncate(text) == "Hello world"
+
+
+def test_leading_and_trailing_whitespace_are_ignored():
+    text = "     Hello world     "
+
+    assert truncate(text) == "Hello world"
+
+
+def test_whitespace_before_ellipsis_is_removed():
+    text = "The quick brown fox jumps over the lazy dog"
+
+    result = truncate(text, max_chars=20)
+
+    assert not result[-2].isspace()
+    assert result[-1] == "…"
+
+
+def test_does_not_put_ellipsis_after_period():
+    text = "This is a sentence. " + "a" * 100
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith(".…")
+
+
+def test_does_not_put_ellipsis_after_comma():
+    text = "This is a sentence, " + "a" * 100
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith(",…")
+
+
+def test_does_not_put_ellipsis_after_exclamation_mark():
+    text = "This is exciting! " + "a" * 100
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith("!…")
+
+
+def test_does_not_put_ellipsis_after_question_mark():
+    text = "Is this working? " + "a" * 100
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith("?…")
+
+
+def test_does_not_put_ellipsis_after_colon():
+    text = "Here is the answer: " + "a" * 100
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith(":…")
+
+
+def test_does_not_put_ellipsis_after_semicolon():
+    text = "Here is the answer; " + "a" * 100
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith(";…")
+
+
+def test_ellipsis_character_is_used():
+    text = "a" * 150
+
+    result = truncate(text)
+
+    assert result.endswith("…")
+    assert "..." not in result
+
+
+def test_unicode_graphemes_are_not_split():
+    # Each "é" consists of two Unicode code points but one grapheme.
+    text = "e\u0301" * 150
+
+    result = truncate(text, max_chars=100)
+
+    assert result.endswith("…")
+    assert len(result) > 100
+    assert result[:-1] == "e\u0301" * 100
+
+
+def test_emoji_graphemes_are_not_split():
+    text = "👍" * 150
+
+    result = truncate(text, max_chars=100)
+
+    assert result == "👍" * 100 + "…"
+
+
+def test_emoji_with_skin_tone_is_one_grapheme():
+    text = "👍🏽" * 150
+
+    result = truncate(text, max_chars=100)
+
+    assert result == "👍🏽" * 100 + "…"
+
+
+def test_zwj_emoji_is_not_split():
+    # Family emoji is composed of multiple Unicode code points
+    # but should be treated as one grapheme.
+    family = "👨‍👩‍👧‍👦"
+    text = family * 150
+
+    result = truncate(text, max_chars=100)
+
+    assert result == family * 100 + "…"
+
+
+def test_newline_counts_as_whitespace():
+    text = "Hello world\n\n" + "a" * 100
+
+    result = truncate(text, max_chars=12)
+
+    assert not result.endswith("\n…")
+
+
+def test_tab_counts_as_whitespace():
+    text = "Hello\tworld\t" + "a" * 100
+
+    result = truncate(text, max_chars=12)
+
+    assert not result.endswith("\t…")
+
+
+def test_empty_string():
+    assert truncate("") == ""
+
+
+def test_whitespace_only_string():
+    assert truncate("     \t\n   ") == ""
+
+
+def test_custom_max_chars_one():
+    result = truncate("Hello world", max_chars=1)
+
+    assert result == "H…"
+
+
+def test_custom_max_chars_with_unicode():
+    text = "👍🏽" * 10
+
+    result = truncate(text, max_chars=3)
+
+    assert result == "👍🏽" * 3 + "…"
+
+
+@pytest.mark.parametrize(
+    "punctuation",
+    [".", ",", "!", "?", ";", ":"],
+)
+def test_punctuation_is_not_immediately_before_ellipsis(punctuation):
+    text = ("word" + punctuation + " ") * 30
+
+    result = truncate(text, max_chars=20)
+
+    assert not result.endswith(punctuation + "…")
+
+
+@pytest.mark.parametrize(
+    "max_chars",
+    [1, 2, 5, 10, 25, 50, 99, 100],
+)
+def test_result_never_exceeds_max_chars_plus_ellipsis(max_chars):
+    text = "a" * 500
+
+    result = truncate(text, max_chars=max_chars)
+
+    assert len(result) == max_chars + 1
+    assert result[-1] == "…"
+
+
+@pytest.mark.parametrize(
+    "long_word",
+    [1, 5, 10, 20, 50],
+)
+def test_long_word_parameter_is_respected(long_word):
+    text = "a" * 100
+
+    result = truncate(text, max_chars=50, long_word=long_word)
+
+    assert result == "a" * 50 + "…"
